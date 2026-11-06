@@ -8,11 +8,45 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./NOVA-VPN
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-# Дальше всё оставляете как было...
+
+      - name: Find Project Root
+        id: find-path
+        run: |
+          PATH_TO_PUB=$(find . -name "pubspec.yaml" -not -path "*/.*" | head -n 1)
+          if [ -z "$PATH_TO_PUB" ]; then
+            echo "Error: pubspec.yaml not found anywhere!" && exit 1
+          fi
+          DIR_PATH=$(dirname "$PATH_TO_PUB")
+          echo "project_dir=$DIR_PATH" >> $GITHUB_OUTPUT
+          echo "Found Flutter project in: $DIR_PATH"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: ${{ steps.find-path.outputs.project_dir }}
+
+      - name: Build APK
+        run: flutter build apk --debug
+        working-directory: ${{ steps.find-path.outputs.project_dir }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: |
+            ${{ steps.find-path.outputs.project_dir }}/build/app/outputs/flutter-apk/app-debug.apk
+            
